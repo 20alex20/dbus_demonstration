@@ -8,30 +8,46 @@
 #include <string>
 #include "nlohmann/json.hpp"
 
-
 typedef std::map<std::string, std::variant<uint32_t, std::string>> dict;
 
-void onConfigurationChanged(uint32_t& timeout, std::string& timeoutPhrase, const dict& config) {
-    dict::const_iterator search;
-    if ((search=config.find("Timeout")) != config.end())
-        timeout = std::get<uint32_t>(search->second);
-    if ((search= config.find("TimeoutPhrase")) != config.end())
-        timeoutPhrase = std::get<std::string>(search->second);
-}
-
 void init(uint32_t& timeout, std::string& timeoutPhrase) {
-    std::ifstream initial_config("~/com.system.configurationManager/confManagerApplication1.json",
-                                 std::ifstream::binary);
-    if (!initial_config) {
-        timeout = 500;
-        timeoutPhrase = "Hello!";
-        return;
-    }
+    std::ifstream initialConfig("~/com.system.configurationManager/confManagerApplication1.json", std::ifstream::binary);
+    bool errors = !initialConfig;
 
     nlohmann::json jsonObj;
-    initial_config >> jsonObj;
-    timeout = jsonObj["Timeout"];
-    timeoutPhrase = jsonObj["TimeoutPhrase"];
+    if (!errors) {
+        try {
+            initialConfig >> jsonObj;
+            errors = !jsonObj.contains("Timeout") || !jsonObj.contains("TimeoutPhrase") ||
+                     !jsonObj["Timeout"].is_number_unsigned() || !jsonObj["TimeoutPhrase"].is_string();
+        }
+        catch (nlohmann::json::parse_error& ex) {
+            errors = true;
+        }
+    }
+
+    if (errors) {
+        timeout = 500;
+        timeoutPhrase = "Hello!";
+    }
+    else {
+        timeout = jsonObj["Timeout"];
+        timeoutPhrase = jsonObj["TimeoutPhrase"];
+    }
+}
+
+void establishСonnection(uint32_t& timeout, std::string& timeoutPhrase) {
+    sdbus::ServiceName serviceName{"com.system.configurationManager"};
+    sdbus::ObjectPath objectPath{"/com/system/configurationManager/Application/confManagerApplication1"};
+    auto proxy = sdbus::createProxy(std::move(serviceName), std::move(objectPath));
+
+    sdbus::InterfaceName interfaceName{"com.system.configurationManager.Application.Configuration"};
+    proxy->uponSignal("configurationChanged").onInterface(interfaceName).call(
+        [&timeout, &timeoutPhrase](const dict& config) {
+            timeout = std::get<uint32_t>(config.at("Timeout"));
+            timeoutPhrase = std::get<std::string>(config.at("TimeoutPhrase"));
+        }
+    );
 }
 
 int main(int argc, char *argv[]) {
@@ -42,21 +58,13 @@ int main(int argc, char *argv[]) {
     
     bool connected = false;
     while (true) {
-        if (!connected) try {
-            sdbus::ServiceName serviceName{"com.system.configurationManager"};
-            sdbus::ObjectPath objectPath{"/com/system/configurationManager/Application/confManagerApplication1"};
-            auto proxy = sdbus::createProxy(std::move(serviceName), std::move(objectPath));
-            
-            sdbus::InterfaceName interfaceName{"com.system.configurationManager.Application.Configuration"};
-            proxy->uponSignal("configurationChanged").onInterface(interfaceName).call(
-                [&timeout, &timeoutPhrase](const dict& config) {
-                    onConfigurationChanged(timeout, timeoutPhrase, config);
-                }
-            );
-            
-            connected = true;
-        } catch (const sdbus::Error& e) { }
-        
+        if (!connected) {
+            try {
+                establishСonnection(timeout, timeoutPhrase);
+                connected = true;
+            }
+            catch (const sdbus::Error& e) { }
+        }
         std::cout << timeoutPhrase << std::endl;
         std::this_thread::sleep_for(std::chrono::milliseconds(timeout));
     }
