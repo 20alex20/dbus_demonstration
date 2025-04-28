@@ -6,6 +6,7 @@
 #include <map>
 #include <variant>
 #include <string>
+#include "nlohmann/json.hpp"
 
 
 typedef std::map<std::string, std::variant<uint32_t, std::string>> dict;
@@ -18,9 +19,26 @@ void onConfigurationChanged(uint32_t& timeout, std::string& timeoutPhrase, const
         timeoutPhrase = std::get<std::string>(search->second);
 }
 
+void init(uint32_t& timeout, std::string& timeoutPhrase) {
+    std::ifstream initial_config("~/com.system.configurationManager/confManagerApplication1.json",
+                                 std::ifstream::binary);
+    if (!initial_config) {
+        timeout = 500;
+        timeoutPhrase = "Hello!";
+        return;
+    }
+
+    nlohmann::json jsonObj;
+    initial_config >> jsonObj;
+    timeout = jsonObj["Timeout"];
+    timeoutPhrase = jsonObj["TimeoutPhrase"];
+}
+
 int main(int argc, char *argv[]) {
     uint32_t timeout;
     std::string timeoutPhrase;
+
+    init(timeout, timeoutPhrase);
     
     bool connected = false;
     while (true) {
@@ -45,3 +63,4 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
