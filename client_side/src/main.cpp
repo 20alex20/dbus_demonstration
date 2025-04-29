@@ -4,15 +4,21 @@
 #include <thread>
 #include <chrono>
 #include <map>
-#include <variant>
 #include <string>
+#include <pwd.h>
+#include <unistd.h>
 #include "nlohmann/json.hpp"
 
-typedef std::map<std::string, std::variant<uint32_t, std::string>> dict;
+typedef std::map<std::string, sdbus::Variant> dict;
 
 void init(uint32_t& timeout, std::string& timeoutPhrase) {
-    std::ifstream initialConfig("~/com.system.configurationManager/confManagerApplication1.json", std::ifstream::binary);
-    bool errors = !initialConfig;
+    bool errors = !getenv("HOME");
+    std::ifstream initialConfig;
+    if (!errors) {
+        initialConfig.open(std::string(getpwuid(getuid())->pw_dir) + "/com.system.configurationManager/confManagerApplication1.json",
+                           std::ios::binary);
+        errors = !initialConfig;
+    }
 
     nlohmann::json jsonObj;
     if (!errors) {
@@ -36,16 +42,16 @@ void init(uint32_t& timeout, std::string& timeoutPhrase) {
     }
 }
 
-void establishСonnection(uint32_t& timeout, std::string& timeoutPhrase) {
+void establishСonnection(std::unique_ptr<sdbus::IProxy>& proxy, uint32_t& timeout, std::string& timeoutPhrase) {
     sdbus::ServiceName serviceName{"com.system.configurationManager"};
     sdbus::ObjectPath objectPath{"/com/system/configurationManager/Application/confManagerApplication1"};
-    auto proxy = sdbus::createProxy(std::move(serviceName), std::move(objectPath));
+    proxy = sdbus::createProxy(std::move(serviceName), std::move(objectPath));
 
     sdbus::InterfaceName interfaceName{"com.system.configurationManager.Application.Configuration"};
     proxy->uponSignal("configurationChanged").onInterface(interfaceName).call(
         [&timeout, &timeoutPhrase](const dict& config) {
-            timeout = std::get<uint32_t>(config.at("Timeout"));
-            timeoutPhrase = std::get<std::string>(config.at("TimeoutPhrase"));
+            timeout = config.at("Timeout").get<uint32_t>();
+            timeoutPhrase = config.at("TimeoutPhrase").get<std::string>();
         }
     );
 }
@@ -53,14 +59,14 @@ void establishСonnection(uint32_t& timeout, std::string& timeoutPhrase) {
 int main(int argc, char *argv[]) {
     uint32_t timeout;
     std::string timeoutPhrase;
-
     init(timeout, timeoutPhrase);
-    
+
+    std::unique_ptr<sdbus::IProxy> proxy;
     bool connected = false;
     while (true) {
         if (!connected) {
             try {
-                establishСonnection(timeout, timeoutPhrase);
+                establishСonnection(proxy, timeout, timeoutPhrase);
                 connected = true;
             }
             catch (const sdbus::Error& e) { }
