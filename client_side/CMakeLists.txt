@@ -11,4 +11,4 @@ target_link_libraries(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json)
 
 target_compile_options(${PROJECT_NAME} PRIVATE -std=c++17 -Wall -Wextra -Wpedantic)
 
-install(DIRECTORY install/com.system.configurationManager DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/install/home_user)
+install(DIRECTORY install/com.system.configurationManager DESTINATION $ENV{HOME}/)
