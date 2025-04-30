@@ -15,8 +15,8 @@ void init(uint32_t& timeout, std::string& timeoutPhrase) {
     bool errors = !getenv("HOME");
     std::ifstream initialConfig;
     if (!errors) {
-        initialConfig.open(std::string(getpwuid(getuid())->pw_dir) + "/com.system.configurationManager/confManagerApplication1.json",
-                           std::ios::binary);
+        initialConfig.open(std::string(getpwuid(getuid())->pw_dir) +
+                           "/com.system.configurationManager/confManagerApplication1.json", std::ios::binary);
         errors = !initialConfig;
     }
 
@@ -50,8 +50,11 @@ void establishСonnection(std::unique_ptr<sdbus::IProxy>& proxy, uint32_t& timeo
     sdbus::InterfaceName interfaceName{"com.system.configurationManager.Application.Configuration"};
     proxy->uponSignal("configurationChanged").onInterface(interfaceName).call(
         [&timeout, &timeoutPhrase](const dict& config) {
-            timeout = config.at("Timeout").get<uint32_t>();
-            timeoutPhrase = config.at("TimeoutPhrase").get<std::string>();
+            dict::const_iterator search;
+            if ((search=config.find("Timeout")) != config.end() && search->second.containsValueOfType<uint32_t>())
+                timeout = search->second.get<uint32_t>();
+            if ((search=config.find("TimeoutPhrase")) != config.end() && search->second.containsValueOfType<std::string>())
+                timeoutPhrase = search->second.get<std::string>();
         }
     );
 }

@@ -53,6 +53,9 @@ void generateObject(sdbus::IConnection* connection, const std::string& destDir, 
     auto changeConfiguration = [app, &destDir](const std::string& key, const sdbus::Variant& value) {
         if (key != "Timeout" && key != "TimeoutPhrase")
             DBUS_ERROR("Unknown key transmitted");
+        if (key == "Timeout" && !value.containsValueOfType<uint32_t>() ||
+            key == "TimeoutPhrase" && !value.containsValueOfType<std::string>())
+            DBUS_ERROR("Invalid parameter value type");
         if (app->config.empty())
             app->config = getConfig(destDir + "/" + app->name + ".json");
         app->config[key] = value;
