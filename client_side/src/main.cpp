@@ -33,8 +33,8 @@ void init(uint32_t &timeout, std::string &timeoutPhrase) {
   }
 
   if (errors) {
-    timeout = 500;
-    timeoutPhrase = "Hello!";
+    timeout = 1000;
+    timeoutPhrase = "Default text";
   } else {
     timeout = jsonObj["Timeout"];
     timeoutPhrase = jsonObj["TimeoutPhrase"];
